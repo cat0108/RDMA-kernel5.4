@@ -22,6 +22,8 @@
 #include <linux/swap_slots.h>
 #include <linux/huge_mm.h>
 
+#include <linux/frontswap.h>
+
 #include <asm/pgtable.h>
 #include "internal.h"
 
@@ -543,6 +545,8 @@ struct page *swap_cluster_readahead(swp_entry_t entry, gfp_t gfp_mask,
 				struct vm_fault *vmf)
 {
 	struct page *page;
+	struct page *fault_page;
+	int cpu;
 	unsigned long entry_offset = swp_offset(entry);
 	unsigned long offset = entry_offset;
 	unsigned long start_offset, end_offset;
@@ -552,6 +556,10 @@ struct page *swap_cluster_readahead(swp_entry_t entry, gfp_t gfp_mask,
 	bool do_poll = true, page_allocated;
 	struct vm_area_struct *vma = vmf->vma;
 	unsigned long addr = vmf->address;
+
+	cpu=get_cpu();
+	fault_page=read_swap_cache_async(entry, gfp_mask, vma, addr, do_poll);
+	put_cpu();
 
 	mask = swapin_nr_pages(offset) - 1;
 	if (!mask)
@@ -574,6 +582,7 @@ struct page *swap_cluster_readahead(swp_entry_t entry, gfp_t gfp_mask,
 		end_offset = si->max - 1;
 
 	blk_start_plug(&plug);
+	printk("begin swap_cluster_readahead\n");
 	for (offset = start_offset; offset <= end_offset ; offset++) {
 		/* Ok, do the async read-ahead now */
 		page = __read_swap_cache_async(
@@ -582,19 +591,21 @@ struct page *swap_cluster_readahead(swp_entry_t entry, gfp_t gfp_mask,
 		if (!page)
 			continue;
 		if (page_allocated) {
-			swap_readpage(page, false);
 			if (offset != entry_offset) {
+				swap_readpage_async(page);
 				SetPageReadahead(page);
 				count_vm_event(SWAP_RA);
 			}
 		}
 		put_page(page);
 	}
+	printk("end swap_cluster_readahead\n");
 	blk_finish_plug(&plug);
 
 	lru_add_drain();	/* Push any new pages onto the LRU now */
 skip:
-	return read_swap_cache_async(entry, gfp_mask, vma, addr, do_poll);
+	frontswap_poll_load(cpu);
+	return fault_page;
 }
 
 int init_swap_address_space(unsigned int type, unsigned long nr_pages)

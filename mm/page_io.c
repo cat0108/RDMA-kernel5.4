@@ -366,6 +366,17 @@ out:
 	return ret;
 }
 
+int swap_readpage_async(struct page *page)
+{
+	VM_BUG_ON_PAGE(!PageSwapCache(page), page);
+	VM_BUG_ON_PAGE(!PageLocked(page), page);
+	VM_BUG_ON_PAGE(PageUptodate(page), page);
+
+	printk("use frontswap_load_async\n");
+	BUG_ON(frontswap_load_async(page));
+	return 0;
+}
+
 int swap_set_page_dirty(struct page *page)
 {
 	struct swap_info_struct *sis = page_swap_info(page);

@@ -386,6 +386,7 @@ extern void kswapd_stop(int nid);
 
 /* linux/mm/page_io.c */
 extern int swap_readpage(struct page *page, bool do_poll);
+extern int swap_readpage_async(struct page *page);
 extern int swap_writepage(struct page *page, struct writeback_control *wbc);
 extern void end_swap_bio_write(struct bio *bio);
 extern int __swap_writepage(struct page *page, struct writeback_control *wbc,

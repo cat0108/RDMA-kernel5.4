@@ -324,6 +324,55 @@ int __frontswap_load(struct page *page)
 }
 EXPORT_SYMBOL(__frontswap_load);
 
+int __frontswap_load_async(struct page *page)
+{
+	int ret = -1;
+	swp_entry_t entry = { .val = page_private(page), };
+	int type = swp_type(entry);
+	struct swap_info_struct *sis = swap_info[type];
+	pgoff_t offset = swp_offset(entry);
+	struct frontswap_ops *ops;
+
+	VM_BUG_ON(!frontswap_ops);
+	VM_BUG_ON(!PageLocked(page));
+	VM_BUG_ON(sis == NULL);
+
+	if (!__frontswap_test(sis, offset))
+		return -1;
+
+	/* Try loading from each implementation, until one succeeds. */
+	for_each_frontswap_ops(ops) {
+		ret = ops->load_async(type, offset, page);
+		if (!ret) /* successful load */
+			break;
+	}
+	if (ret == 0) {
+		inc_frontswap_loads();
+		if (frontswap_tmem_exclusive_gets_enabled) {
+			SetPageDirty(page);
+			__frontswap_clear(sis, offset);
+		}
+	}
+
+	return ret;
+}
+EXPORT_SYMBOL(__frontswap_load_async);
+
+int __frontswap_poll_load(int cpu)
+{
+	struct frontswap_ops *ops;
+
+	VM_BUG_ON(!frontswap_ops);
+
+	/* Try loading from each implementation, until one succeeds. */
+	for_each_frontswap_ops(ops)
+		return ops->poll_load(cpu);
+
+	BUG();
+	return -1;
+}
+EXPORT_SYMBOL(__frontswap_poll_load);
+
 /*
  * Invalidate any data from frontswap associated with the specified swaptype
  * and offset so that a subsequent "get" will fail.
