@@ -201,11 +201,13 @@ int swap_writepage(struct page *page, struct writeback_control *wbc)
 		goto out;
 	}
 	if (frontswap_store(page) == 0) {
+		printk("use frontswap_store\n");
 		set_page_writeback(page);
 		unlock_page(page);
 		end_page_writeback(page);
 		goto out;
 	}
+	printk("use __swap_writepage\n");
 	ret = __swap_writepage(page, wbc, end_swap_bio_write);
 out:
 	return ret;
@@ -305,11 +307,13 @@ int swap_readpage(struct page *page, bool synchronous)
 	VM_BUG_ON_PAGE(!PageLocked(page), page);
 	VM_BUG_ON_PAGE(PageUptodate(page), page);
 	if (frontswap_load(page) == 0) {
-		SetPageUptodate(page);
-		unlock_page(page);
+		printk("use frontswap_load\n");
+		/*[cat] this can be done by fastswap*/
+		// SetPageUptodate(page);
+		// unlock_page(page);
 		goto out;
 	}
-
+	printk("not use frontswap_load\n");
 	if (sis->flags & SWP_FS) {
 		struct file *swap_file = sis->swap_file;
 		struct address_space *mapping = swap_file->f_mapping;
