@@ -12,7 +12,7 @@ static void *drambuf;
 int sswap_rdma_write(struct page *page, u64 roffset)
 {
 	void *page_vaddr;
-
+	printk("write being\n");
 	page_vaddr = kmap_atomic(page);
 	copy_page((void *) (drambuf + roffset), page_vaddr);
 	kunmap_atomic(page_vaddr);
